@@ -14,8 +14,8 @@ include_once('./Customizing/global/plugins/Services/Repository/RepositoryObject/
  * @author Jesus Copado <jesus.copado@fim.uni-erlangen.de>
  * @version $Id$
  * 
- * @ilCtrl_isCalledBy ilObjExternalContentGUI: ilRepositoryGUI, ilAdministrationGUI, ilObjPluginDispatchGUI
- * @ilCtrl_Calls ilObjExternalContentGUI: ilPermissionGUI, ilExternalContentLogGUI, ilInfoScreenGUI, ilObjectCopyGUI, ilCommonactionDispatcherGUI, ilLearningProgressGUI
+ * @ilCtrl_isCalledBy ilObjExternalContentGUI: ilRepositoryGUI, ilAdministrationGUI, ilObjPluginDispatchGUI, ilPCExternalContentPluginGUI
+ * @ilCtrl_Calls ilObjExternalContentGUI: ilPermissionGUI, ilExternalContentLogGUI, ilInfoScreenGUI, ilObjectCopyGUI, ilCommonactionDispatcherGUI, ilLearningProgressGUI, ilPCExternalContentPluginGUI
  */
 class ilObjExternalContentGUI extends ilObjectPluginGUI
 {
@@ -26,6 +26,11 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
      * Valid meta data groups for displaying
      */
     var $meta_groups = array('General', 'LifeCycle', 'Technical', 'Rights');
+
+	/**
+	 * @var
+	 */
+    var $form;
 
     /**
      * Initialisation
@@ -415,8 +420,8 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
     function save()
     {
         global $rbacsystem, $ilErr;
-        
-        
+
+
             $new_type = $this->getType();
             $_REQUEST["new_type"] = $new_type;
             if (!$rbacsystem->checkAccess("create", $_GET["ref_id"], $new_type))
@@ -489,11 +494,12 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
     /**
      * Init properties form
      *
-     * @param        int        $a_mode        Form Edit Mode (IL_FORM_EDIT | IL_FORM_CREATE)
-     * @param		 array		(assoc) form values
-     * @access       protected
+	 * @param int $a_mode Form Edit Mode (IL_FORM_EDIT | IL_FORM_CREATE)
+	 * @param array $a_values
+	 * @param bool $page_component if TRUE, this function is called by the PC Plugin
+	 * @access public (changed from protected to allow the PC plugin to use this method)
      */
-    protected function initForm($a_mode, $a_values = array())
+    public function initForm($a_mode, $a_values = array(), $page_component = FALSE)
     {
         if (is_object($this->form))
         {
@@ -539,10 +545,23 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
             }
             $this->form->addItem($item);
 
-            $this->form->setTitle($this->txt('xxco_new'));
-            $this->form->addCommandButton((!$this->checkCreationMode() ? 'update' : 'save'), $this->lng->txt('save'));
-            $this->form->addCommandButton('cancelCreate', $this->lng->txt("cancel"));
-        }
+            //Create settings_id
+			global $ilDB;
+
+			$item = new ilHiddenInputGUI('settings_id');
+			$item->setValue($ilDB->nextId("xxco_data_settings"));
+			$this->form->addItem($item);
+
+			//If $page_component is true, do not add the command buttons.
+			if (!$page_component)
+			{
+				$this->form->addCommandButton((!$this->checkCreationMode() ? 'update' : 'save'), $this->lng->txt('save'));
+				$this->form->addCommandButton('cancelCreate', $this->lng->txt("cancel"));
+			}
+
+			$this->form->setTitle($this->txt('xxco_new'));
+
+		}
         else
         {
             $item = new ilCheckboxInputGUI($this->lng->txt('online'), 'online');
@@ -553,13 +572,24 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
 				$item->setChecked(true);
 			}        
           	$this->form->addItem($item);
+
+			//Add settings_id
+			$item = new ilHiddenInputGUI('settings_id');
+			$item->setValue($a_values['settings_id']);
+			$this->form->addItem($item);
             
           	// add the type specific fields
         	$this->object->typedef->addFormElements($this->form, $a_values, "object");
-        	            
+
+			//If $page_component is true, do not add the command buttons.
+			if (!$page_component)
+			{
+				$this->form->setFormAction($this->ctrl->getFormAction($this));
+				$this->form->addCommandButton("update", $this->lng->txt("save"));
+				$this->form->addCommandButton("view", $this->lng->txt("cancel"));
+			}
+
             $this->form->setTitle($this->lng->txt('settings'));
-            $this->form->addCommandButton("update", $this->lng->txt("save"));
-            $this->form->addCommandButton("view", $this->lng->txt("cancel"));
 
             if ($this->object->typedef->getMetaDataUrl())
             {
@@ -583,6 +613,7 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
         $values['type_id'] = $this->object->getTypeId();
         $values['type'] = $this->object->typedef->getTitle();
         $values['instructions'] = $this->object->getInstructions();
+		$values['settings_id'] = $this->object->getSettingsId();
         if ($this->object->getAvailabilityType() == ilObjExternalContent::ACTIVATION_UNLIMITED)
         {
             $values['online'] = '1';
@@ -602,7 +633,8 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
      */
     protected function saveFormValues() 
     {
-
+		//Add SettingsId
+		$this->object->setSettingsId($this->form->getInput("settings_id"));
         $this->object->setTitle($this->form->getInput("title"));
         $this->object->setDescription($this->form->getInput("description"));
         if ($this->form->getInput("type_id"))
@@ -879,6 +911,22 @@ class ilObjExternalContentGUI extends ilObjectPluginGUI
         $value = $obj->checkToken();
         echo $value;
     }
+
+	/**
+	 * @return
+	 */
+	public function getForm()
+	{
+		return $this->form;
+	}
+
+	/**
+	 * @param  $form
+	 */
+	public function setForm($form)
+	{
+		$this->form = $form;
+	}
 }
 
 ?>

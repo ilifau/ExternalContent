@@ -41,6 +41,7 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
     protected $context = null;
     protected $lp_mode = self::LP_INACTIVE;
     protected $lp_threshold = 0.5;
+    protected $settings_id;
 
     /**
      * Return URL: This is a run-time variable set by the GUI and not stored
@@ -156,6 +157,29 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
         return $this->meta_data_xml;
     }
 
+    /**
+     * @return integer
+     */
+    public function getSettingsId()
+    {
+        return $this->settings_id;
+    }
+
+    /**
+     * @param integer $settings_id
+     */
+    public function setSettingsId($settings_id)
+    {
+        $this->settings_id = $settings_id;
+    }
+
+    /**
+     * @param null $context
+     */
+    public function setContext($context)
+    {
+        $this->context = $context;
+    }
 
     /**
      * Get online status
@@ -646,7 +670,7 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
      * @param	array	list of valid types
      * @return 	array	context array ("ref_id", "title", "type")
      */
-    public function getContext($a_valid_types = array('crs', 'grp', 'cat', 'root')) {
+    public function getContext($a_valid_types = array('crs', 'grp', 'cat', 'lm', 'root')) {
         global $tree;
 
         if (!isset($this->context)) {
@@ -655,17 +679,14 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
 
             // check fromm inner to outer
             $path = array_reverse($tree->getPathFull($this->getRefId()));
-            foreach ($path as $key => $row)
-            {
-                if (in_array($row['type'], $a_valid_types))
-                {
-					// take an existing inner context outside a course
-					if (in_array($row['type'], array('cat', 'root')) && !empty($this->context))
-					{
-						break;
-					}
+            foreach ($path as $key => $row) {
+                if (in_array($row['type'], $a_valid_types)) {
+                    // take an existing inner context outside a course
+                    if (in_array($row['type'], array('cat', 'root')) && !empty($this->context)) {
+                        break;
+                    }
 
-					$this->context['id'] = $row['child'];
+                    $this->context['id'] = $row['child'];
                     $this->context['title'] = $row['title'];
                     $this->context['type'] = $row['type'];
 
@@ -724,10 +745,10 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
     public function doUpdate() {
         global $ilDB;
 
-
         $ilDB->replace('xxco_data_settings', array(
-            'obj_id' => array('integer', $this->getId()),
+            'settings_id' => array('integer', $this->getSettingsId()),
                 ), array(
+            'obj_id' => array('integer', $this->getId()),
             'type_id' => array('integer', $this->getTypeId()),
             'availability_type' => array('integer', $this->getAvailabilityType()),
             'instructions' => array('text', $this->getInstructions()),
@@ -770,9 +791,10 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
         global $ilDB;
 
         $ilDB->replace('xxco_data_values', array(
-            'obj_id' => array('integer', $this->getId()),
+            'settings_id' => array('integer', $this->getSettingsId()),
             'field_name' => array('text', $a_field_name)
                 ), array(
+            'obj_id' => array('integer', $this->getId()),
             'field_value' => array('text', $a_field_value)
                 )
         );
@@ -786,8 +808,8 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
     function getInputValues() {
         global $ilDB;
 
-        $query = 'SELECT * FROM xxco_data_values WHERE obj_id = '
-                . $ilDB->quote($this->getId(), 'integer');
+        $query = 'SELECT * FROM xxco_data_values WHERE settings_id = '
+                . $ilDB->quote($this->getSettingsId(), 'integer');
         $res = $ilDB->query($query);
 
         $values = array();
@@ -800,7 +822,7 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
     /**
      * Delete
      *
-     * @access public
+     * @access publicpD
      */
     public function doDelete() {
         global $ilDB;
@@ -836,6 +858,7 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
             $this->setMetaDataXML($row->meta_data_xml);
             $this->setLPMode($row->lp_mode);
             $this->setLPThreshold($row->lp_threshold);
+            $this->setSettingsId(($row->settings_id));
         }
     }
 
@@ -853,13 +876,15 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
             'instructions' => array('text', $this->getInstructions()),
             'meta_data_xml' => array('text', $this->getMetaDataXML()),
             'lp_mode' => array('integer', $this->getLPMode()),
-            'lp_threshold' => array('float', $this->getLPThreshold())
+            'lp_threshold' => array('float', $this->getLPThreshold()),
+            'settings_id' => array('integer', $this->getSettingsId())
          ));
         //Value filling
         $values = $this->getInputValues();
         
         foreach($values as $it => $value){
             $ilDB->insert('xxco_data_values', array(
+            'settings_id' => array('integer', $ilDB->nextId('xxco_data_settings')),
             'obj_id' => array('integer', $new_obj->getId()),
             'field_name' => array('text', $it),
             'field_value' => array('text', $value)
@@ -1013,6 +1038,17 @@ class ilObjExternalContent extends ilObjectPlugin implements ilLPStatusPluginInt
             $this->plugin->includeClass('class.ilExternalContentLPStatus.php');
             ilExternalContentLPStatus::trackAccess($ilUser->getId(),$this->getId(), $this->getRefId());
         }
+    }
+
+    /**
+     * This method search in th DB for the settings Id of a certain object
+     * @param $a_obj_id
+     */
+    public function getSettingsIdForObj($a_obj_id){
+
+
+        //TODO Allow multiple objects in the same page
+
     }
 }
 

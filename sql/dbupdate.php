@@ -591,3 +591,88 @@ if(!$ilDB->tableExists('xxco_results'))
         $ilDB->dropTable('xxco_data_log');
     }
 ?>
+<#28>
+<?php
+
+//Create settings_id in data_settings
+if (!$ilDB->tableColumnExists('xxco_data_settings', 'settings_id'))
+{
+	$ilDB->addTableColumn('xxco_data_settings', 'settings_id', array(
+		'type' => 'integer',
+		'length' => 4,
+		'notnull' => true,
+		'default' => 0
+	));
+}
+
+//Add a sequence to the table
+if(!$ilDB->tableExists('xxco_data_settings_seq'))
+{
+	$ilDB->createSequence("xxco_data_settings");
+}
+
+//Add a value to settings_id with nextId
+$query = $ilDB->query("SELECT * FROM xxco_data_settings");
+while ($res = $ilDB->fetchObject($query))
+{
+	$ilDB->replace('xxco_data_settings',
+		array(
+			'obj_id' => array('integer', $res->obj_id)
+		),
+		array(
+			'type_id' => array('integer', $res->type_id),
+			'instructions' => array('text', $res->instructions),
+			'availability_type' => array('integer', $res->availability_type),
+			'meta_data_xml' => array('clob', $res->meta_data_xml),
+			'lp_mode' => array('integer', $res->lp_mode),
+			'lp_threshold' => array('float', $res->lp_threshold),
+			'settings_id' => array('integer', $ilDB->nextId("xxco_data_settings"))
+		)
+	);
+}
+
+//Set settings_id as Primary key
+$ilDB->dropPrimaryKey("xxco_data_settings", array("obj_id"));
+$ilDB->addPrimaryKey("xxco_data_settings", array("settings_id"));
+
+//Create settings_id in data_values
+if (!$ilDB->tableColumnExists('xxco_data_values', 'settings_id'))
+{
+	$ilDB->addTableColumn('xxco_data_values', 'settings_id', array(
+		'type' => 'integer',
+		'length' => 4,
+		'notnull' => true,
+		'default' => 0
+	));
+}
+
+//Fill settings_id in data_values
+
+//Get relations from xxco_data_settings
+$id_relations_table = array();
+$query = $ilDB->query("SELECT obj_id, settings_id FROM xxco_data_settings");
+while ($res = $ilDB->fetchObject($query))
+{
+	$id_relations_table[$res->obj_id] = $res->settings_id;
+}
+
+//include settings_id in xxco_data_values
+$query = $ilDB->query("SELECT * FROM xxco_data_values");
+while ($res = $ilDB->fetchObject($query))
+{
+	$ilDB->replace('xxco_data_values',
+		array(
+			'obj_id' => array('integer', $res->obj_id),
+			'field_name' => array('text', $res->field_name)
+		),
+		array(
+			'field_value' => array('text', $res->field_value),
+			'settings_id' => array('integer', (int) $id_relations_table[$res->obj_id])
+		)
+	);
+}
+
+//Set settings_id and field_name as primary key instead of obj_id
+$ilDB->dropPrimaryKey("xxco_data_values", array("obj_id"));
+$ilDB->addPrimaryKey("xxco_data_values", array("field_name", "settings_id"));
+?>
