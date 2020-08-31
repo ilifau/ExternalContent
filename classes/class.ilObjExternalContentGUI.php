@@ -14,7 +14,7 @@ include_once('./Customizing/global/plugins/Services/Repository/RepositoryObject/
  * @author Jesus Copado <jesus.copado@fim.uni-erlangen.de>
  * @version $Id$
  * 
- * @ilCtrl_isCalledBy ilObjExternalContentGUI: ilRepositoryGUI, ilAdministrationGUI, ilObjPluginDispatchGUI, ilPCExternalContentPluginGUI
+ * @ilCtrl_isCalledBy ilObjExternalContentGUI: ilRepositoryGUI, ilAdministrationGUI, ilObjPluginDispatchGUI
  * @ilCtrl_Calls ilObjExternalContentGUI: ilPermissionGUI, ilExternalContentLogGUI, ilInfoScreenGUI, ilObjectCopyGUI, ilCommonactionDispatcherGUI, ilLearningProgressGUI, ilPCExternalContentPluginGUI
  */
 class ilObjExternalContentGUI extends ilObjectPluginGUI
