@@ -9,6 +9,10 @@ trait ilExternalContentGUIBase
     protected ilLanguage $lng;
     protected ilTabsGUI $tabs;
     protected ilToolbarGUI $toolbar;
+    protected \ILIAS\UI\Factory $ui_factory;
+    protected \ILIAS\UI\Renderer $ui_renderer;
+    protected \ILIAS\HTTP\Services $http;
+    protected \ILIAS\Refinery\Factory $refinery;
 
     /** @var ilGlobalTemplate $tpl */
     protected  $tpl;
@@ -24,5 +28,9 @@ trait ilExternalContentGUIBase
         $this->tabs = $DIC->tabs();
         $this->toolbar = $DIC->toolbar();
         $this->tpl = $DIC->ui()->mainTemplate();
+        $this->ui_factory = $DIC->ui()->factory();
+        $this->ui_renderer = $DIC->ui()->renderer();
+        $this->http = $DIC->http();
+        $this->refinery = $DIC->refinery();
     }
 }
