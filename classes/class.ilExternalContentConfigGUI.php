@@ -4,6 +4,8 @@
  * GPLv2, see LICENSE 
  */
 
+use ILIAS\UI\URLBuilder;
+
 /**
  * ExternalContent plugin: configuration GUI
  *
@@ -139,10 +141,108 @@ class ilExternalContentConfigGUI extends ilPluginConfigGUI
      */
     protected function listTypes()
     {
+        $this->listTypes8();
+        return;
+        
         $table_gui = new ilExternalContentTypesTableGUI($this, 'listTypes');
         $table_gui->init($this);
         $this->tpl->setContent($table_gui->getHTML());
     }
+
+    /**
+     * Show a list of the xxco types
+     */
+    protected function listTypes8()
+    {
+        $this->toolbar->addComponent(
+            $this->ui_factory->button()->standard($this->lng->txt('rep_robj_xxco_create_type'), 
+                $this->ctrl->getLinkTarget($this, 'createType'))
+        );
+        
+        $plugin = ilExternalContentPlugin::getInstance();
+        $retrieval = new ilExternalContentTypesRetrieval($this->ui_factory, $this->ui_renderer, $this->lng, $plugin);
+
+        $df = new \ILIAS\Data\Factory();
+        
+        /** this is the endpoint for actions, in this case the same page. */
+        /** this is the endpoint for actions, in this case the same page. */
+        $here_uri = $df->uri($this->http->request()->getUri()->__toString());
+
+        /**
+         * Actions' commands and the row-ids affected are relayed to the server via GET.
+         * The URLBuilder orchestrates query-paramters (a.o. by assigning namespace)
+         */
+        $url_builder = new URLBuilder($here_uri);
+        $query_params_namespace = ['datatable', 'example'];
+
+        /**
+         * We have to claim those parameters. In return, there is a token to modify
+         * the value of the param; the tokens will work only with the given copy
+         * of URLBuilder, so acquireParameters will return the builder as first entry,
+         * followed by the tokens.
+         */
+        list($url_builder, $action_parameter_token, $row_id_token) =
+            $url_builder->acquireParameters(
+                $query_params_namespace,
+                "table_action", //this is the actions's parameter name
+                "type_ids"   //this is the parameter name to be used for row-ids
+            );
+
+        /**
+         * array<string, Action> [action_id => Action]
+         */
+        $actions = [
+            'edit' => $this->ui_factory->table()->action()->single( //never in multi actions
+            /** the label as shown in dropdowns */
+                $this->lng->txt('edit'),
+                /** set the actions-parameter's value; will become '&datatable_example_table_action=edit' */
+                $url_builder->withParameter($action_parameter_token, "edit"),
+                /** the Table will need to modify the values of this parameter; give the token. */
+                $row_id_token
+            ),
+            'delete' =>
+                $this->ui_factory->table()->action()->standard( //in both
+                    $this->lng->txt('delete'),
+                    $url_builder->withParameter($action_parameter_token, "delete"),
+                    $row_id_token
+                )->withAsync()
+        ];
+        
+        $table = $retrieval->getTable()->withRequest($this->http->request())->withActions($actions);
+
+        $query = $this->http->wrapper()->query();
+        if ($query->has($action_parameter_token->getName())) {
+            $action = $query->retrieve($action_parameter_token->getName(), $this->refinery->to()->string());
+            $ids = $query->retrieve($row_id_token->getName(), $this->refinery->custom()->transformation(fn ($v) => $v));
+
+            if ($action === 'edit') {
+                $id = (int) $ids[0];
+                $this->ctrl->setParameter($this, 'type_id', $id);
+                $this->ctrl->redirect($this, 'editType');
+            }
+            
+            /** take care of the async-call; 'delete'-action asks for it. */
+            if ($action === 'delete') {
+                $items = [];
+                $ids = explode(',', $ids);
+                foreach ($ids as $id) {
+                    $items[] = $this->ui_factory->modal()->interruptiveItem($id, $id);
+                }
+                echo($this->ui_renderer->renderAsync([
+                    $this->ui_factory->modal()->interruptive(
+                        $this->txt('delete_types'),
+                        $this->txt('delete_types_confirmation'),
+                        $this->ctrl->getFormAction($this)
+                    )->withAffectedItems($items)
+                ]));
+                exit();
+            }
+
+        }
+        
+        $this->tpl->setContent($this->ui_renderer->render($table));
+    }
+
 
     /**
      * Show the form to add a new type
@@ -489,6 +589,24 @@ class ilExternalContentConfigGUI extends ilPluginConfigGUI
     {
         $this->type->delete();
         $this->tpl->setOnScreenMessage('success', $this->txt('type_deleted'), true);
+        $this->ctrl->redirect($this, 'listTypes');
+    }
+
+    /**
+     * Delete Types after confirmation (ILIAS 8)
+     */
+    protected function delete()
+    {
+        $ids = $this->http->wrapper()->post()->retrieve('interruptive_items', $this->refinery->custom()->transformation(fn ($v) => $v)); 
+        
+        if (is_array($ids)) {
+            $deleted = [];
+            foreach ($ids as $id) {
+                $type = new ilExternalContentType((int) $id);
+                $type->delete();
+            }
+            $this->tpl->setOnScreenMessage('success', $this->txt('types_deleted'), true);
+        }
         $this->ctrl->redirect($this, 'listTypes');
     }
 }
